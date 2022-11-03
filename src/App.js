@@ -27,7 +27,10 @@ export default function App() {
             id: components[componentData.id].props.data.id
         }
         setComponents(updatedArray)
-        
+    }
+
+    const handleAdd = () => {
+        setComponents([...components, {type: ButtonComponent, props: {data: {val: 0, id:components.length}}, children: null}]);
     }
 
     return (
@@ -43,6 +46,10 @@ export default function App() {
                         <li key={componentIdx}>{component.props.data.val}</li>
                     ))}
                 </ul>
+            </div>
+
+            <div>
+                <button onClick={handleAdd}>Add Component</button>
             </div>
         </div>
     )
