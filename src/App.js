@@ -1,89 +1,157 @@
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 
-function ButtonComponent({ data, handleIncrement }) {
+var counter = 1;
+
+const componentMap = {
+	button: { component: Counter, defaultData: { count: 0 } },
+};
+
+function Counter(props) {
+	const [count, setCount] = useState(props.data.count);
 	return (
-		<button
-			className="bg-purple-100 w-24 h-fit rounded-lg p-1 m-1 hover:bg-purple-200"
-			onClick={() => handleIncrement(data)}
-		>
-			Increment button {data.id + 1}
-		</button>
+		<div className="flex flex-col bg-purple-100 w-36 h-fit rounded-lg p-1 m-1">
+			<button
+				className="hover:bg-purple-200"
+				onClick={() =>
+					props
+						.callback({
+							argument: {
+								data: { ...props.data, count: count + 1 },
+							},
+							action: "update",
+						})
+						.then(setCount(count + 1))
+				}
+			>
+				Increment button # {props.data.id}
+			</button>
+			<button
+				className="bg-purple-300 hover:bg-purple-400"
+				onClick={() =>
+					props.callback({
+						argument: { id: props.data.id },
+						action: "delete",
+					})
+				}
+			>
+				DELETE
+			</button>
+			<div
+				onClick={() =>
+					console.log(
+						props.callback({
+							argument: { id: props.data.id },
+							action: "get",
+						})
+					)
+				}
+			>
+				{count}
+			</div>
+		</div>
 	);
 }
 
-function Counter({ components, handleIncrement }) {
+function Wrapper({ components, callback = { callback } }) {
 	return components.map((x) =>
 		React.createElement(
 			x.type,
-			{ data: x.props.data, handleIncrement, key: x.props.data.id },
+			{
+				data: x.props.data,
+				callback,
+				key: x.props.data.id,
+			},
 			x.children
 		)
 	);
 }
+function generateComponentObj(componentData) {
+	const id = counter++;
+	const data =
+		typeof componentData.data !== "undefined"
+			? componentData.data
+			: componentMap[componentData.type].defaultData;
+	return {
+		componentData: {
+			type: componentMap[componentData.type].component,
+			props: { data: { ...data, id: id } },
+			children: null,
+		},
+		id: id,
+	};
+}
+
+function useCustomHook(initialDataArray) {
+	const componentDataRef = useRef({});
+
+	const initializeComponents = () => {
+		return initialDataArray.map((initialData) => {
+			const { componentData, id } = generateComponentObj(initialData);
+			componentDataRef[id] = componentData.props;
+			return componentData;
+		});
+	};
+
+	const [components, setComponents] = useState(initializeComponents);
+
+	const callback = async ({ argument, action }) => {
+		switch (action) {
+			case "add": {
+				const { componentData, id } = generateComponentObj(argument);
+				setComponents([...components, componentData]);
+				componentDataRef[id] = componentData.props;
+				return null;
+			}
+			case "delete": {
+				setComponents(
+					components.filter(
+						(component) => component.props.data.id !== argument.id
+					)
+				);
+				delete componentDataRef[argument.id];
+				return null;
+			}
+			case "update": {
+				componentDataRef[argument.data.id] = argument;
+				return null;
+			}
+			case "get": {
+				return componentDataRef[argument.id];
+			}
+		}
+		throw Error("Unknown action: " + action);
+	};
+	return {
+		components,
+		callback,
+	};
+}
 
 export default function App() {
-	const [components, setComponents] = useState([
+	const { components, callback } = useCustomHook([
 		{
-			type: ButtonComponent,
-			props: { data: { val: 0, id: 0 } },
-			children: null,
-		},
-		{
-			type: ButtonComponent,
-			props: { data: { val: 0, id: 1 } },
-			children: null,
+			type: "button",
+			data: { count: 27 },
 		},
 	]);
-
-	// callback function
-	const updateComponentData = (componentData) => {
-		const updatedArray = [...components];
-		updatedArray[componentData.id].props.data = {
-			val: components[componentData.id].props.data.val + 1,
-			id: components[componentData.id].props.data.id,
-		};
-		setComponents(updatedArray);
-	};
-
-	const handleAdd = () => {
-		setComponents([
-			...components,
-			{
-				type: ButtonComponent,
-				props: { data: { val: 0, id: components.length } },
-				children: null,
-			},
-		]);
-	};
 
 	return (
 		<div className="flex flex-col space-y-2 items-center pt-8 px-4">
 			<div className="flex flex-row w-full flex-wrap justify-center">
-				<Counter
-					components={components}
-					handleIncrement={updateComponentData}
-				/>
-			</div>
-
-			<div>
-				<ul>
-					{components.map((component, componentIdx) => (
-						<li key={componentIdx}>
-							<div className="flex space-x-1">
-								<p>
-									Button {component.props.data.id + 1} count:
-								</p>
-								<p>{component.props.data.val}</p>
-							</div>
-						</li>
-					))}
-				</ul>
+				<Wrapper components={components} callback={callback} />
 			</div>
 
 			<div>
 				<button
 					className="bg-gray-200 hover:bg-gray-300 w-fit h-12 rounded-lg py-1 px-3 m-1"
-					onClick={handleAdd}
+					onClick={() =>
+						callback({
+							argument: {
+								type: "button",
+							},
+							action: "add",
+						})
+					}
 				>
 					Create New Button
 				</button>
